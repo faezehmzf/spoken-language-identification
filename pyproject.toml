@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "slid"
 version = "1.0.0"
 description = "Spoken language identification (German, Italian, Korean, Spanish) with classical ML"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 
 [tool.setuptools.packages.find]
 where = ["src"]

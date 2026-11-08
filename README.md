@@ -1,42 +1,151 @@
-# Spoken Language Identification from Audiobook Speech
+<div align="center">
 
-Classical machine-learning pipeline that identifies the spoken language — **German, Italian, Korean or Spanish** — of
-short audiobook clips: audio cleaning and augmentation, 381 hand-crafted acoustic features, six classifiers, four
-clustering algorithms, and an evaluation that asks whether the models recognise the **language** or the **voice**.
+<img src="https://capsule-render.vercel.app/api?type=waving&color=0:0f2027,50:203a43,100:2c5364&height=200&section=header&text=Spoken%20Language%20Identification&fontSize=40&fontColor=ffffff&fontAlignY=38&animation=fadeIn" alt="Spoken Language Identification" />
 
-<p align="center"><img src="reports/figures/04_model_comparison.png" width="780"></p>
+</div>
 
-## Results at a glance
+# Language or Voice? Spoken Language Identification from Audiobook Clips
 
-| Model | Random 80/20 split | Contributor-disjoint CV | **Unseen narrators (LONO)** |
+A classical machine-learning pipeline that tells German, Italian, Korean and Spanish apart in one-minute audiobook clips: cleaning, augmentation, 381 acoustic features, six classifiers and four clustering methods. The evaluation then asks whether the models recognise the language or only the narrator's voice.
+
+<div align="left">
+
+[![Python 3.11](https://img.shields.io/badge/python-3.11-blue?style=flat&logo=python&logoColor=white)](https://www.python.org/downloads/)
+[![librosa](https://img.shields.io/badge/librosa-0.11-ff69b4?style=flat)](https://librosa.org)
+[![scikit-learn](https://img.shields.io/badge/scikit--learn-1.9-F7931E?style=flat&logo=scikitlearn&logoColor=white)](https://scikit-learn.org)
+[![Tests](https://github.com/faezehmzf/spoken-language-identification/actions/workflows/tests.yml/badge.svg)](https://github.com/faezehmzf/spoken-language-identification/actions/workflows/tests.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow?style=flat)](LICENSE)
+
+</div>
+
+## Abstract
+
+The dataset has 719 clips (about 12 hours) from 78 contributors, balanced over four languages and two genders. Every model is evaluated under three protocols that differ only in what may be shared between training and test data.
+
+- **The standard split is saturated.** On a stratified 80/20 split five of six classifiers label every test file correctly, and Gaussian Naïve Bayes misses two.
+- **Contributors are not speakers.** Many contributors cut their clips from the same audiobook. An audio-based grouping finds only about 24 distinct narrators, and 22 of them appear on both sides of the random split.
+- **Unseen narrators: 47–73%.** With each narrator held out in turn, accuracy falls to 47–73% (chance is 25%). KNN on a three-dimensional LDA projection holds up best, and Random Forest and the RBF-SVM, which fit the training voices most closely, drop furthest.
+- **Augmentation is the most effective fix tested.** Speed perturbation, pitch shifting and noise raise unseen-narrator accuracy from 47% to 62% for logistic regression. Dropping the F0 group, which includes absolute pitch, adds a further 3 points.
+- **Clustering agrees.** Without labels the clips group by narrator first, then gender, then language: the silhouette-optimal clusterings have narrator NMI 0.93–0.94.
+
+The full method, all tables and the error analysis are in the [report](REPORT.md).
+
+## Table of Contents
+
+1. [Key Features](#key-features)
+2. [Project Workflow](#project-workflow)
+3. [Results at a Glance](#results-at-a-glance)
+4. [Repository Structure](#repository-structure)
+5. [Installation and Usage](#installation-and-usage)
+6. [Dataset](#dataset)
+7. [Key Concepts](#key-concepts)
+8. [Limitations](#limitations)
+9. [References](#references)
+10. [License](#license)
+
+## Key Features
+
+- **Data audit and cleaning:** corrupt, duplicate and mislabelled file checks; 16 kHz mono, DC removal and 80 Hz high-pass; long pauses capped at 0.3 s (short pauses carry rhythm); active-speech loudness normalised to −23 dBFS.
+- **Augmentation for training files only:** pink noise at 10–20 dB SNR, Kaldi-style speed perturbation (×0.9 / ×1.1) and pitch shifts of ±1–3 semitones.
+- **381 features per 10 s segment** in eleven named groups: MFCC with deltas, shifted delta cepstra (7-1-3-7), log-mel, spectral shape and contrast, chroma, ZCR, energy, LPC, speaker-normalised F0, and rhythm (energy modulation spectrum, onset rate, nPVI, pauses).
+- **Narrator estimation:** contributors are merged when their clips are as similar to each other as clips of one contributor (distance ratio below 1.2, same language and gender).
+- **Three evaluation protocols:** random 80/20, contributor-disjoint 5-fold CV and leave-one-narrator-out. Segments and augmented copies of a file never cross a split, and hyperparameters are tuned with file-grouped CV on original audio.
+- **Analysis:** bootstrap confidence intervals (over narrators for the held-out-narrator protocol), accuracy against speech duration, augmentation and feature-group ablations, and K-Means, Ward, GMM and DBSCAN clusterings scored against language, gender and narrator.
+- **Tests:** 17 unit tests on synthetic signals (feature dimensions, SDC values, pause capping, split leakage, narrator merging, purity), run in CI.
+
+## Project Workflow
+
+```mermaid
+flowchart LR
+    A[MP3 clips<br/>4 languages] --> B[Audit and cleaning]
+    B --> C[10 s segments]
+    C --> D[Augmentation<br/>training files only]
+    C & D --> E[381 features]
+    E --> F[Scale, PCA or LDA]
+    F --> G[Six classifiers]
+    G --> H[Random split / contributor CV /<br/>leave-one-narrator-out]
+    E --> I[File-level vectors]
+    I --> J[Four clustering methods]
+    I --> K[Narrator estimation]
+    K --> H
+```
+
+## Results at a Glance
+
+File-level accuracy (about one minute of speech per decision; chance is 25%):
+
+| Model | Random 80/20 | Contributor-disjoint CV | **Unseen narrators** |
 |---|:-:|:-:|:-:|
-| KNN on LDA (3-D) | 100 % | 99.9 % | **73.4 %** |
-| MLP | 100 % | 99.9 % | 65.2 % |
-| Logistic Regression | 100 % | 97.6 % | 61.6 % |
-| SVM (RBF) | 100 % | 99.9 % | 58.1 % |
-| Gaussian Naïve Bayes | 98.6 % | 95.0 % | 55.1 % |
-| Random Forest | 100 % | 97.6 % | 47.4 % |
+| KNN on LDA (3-D) | 100% | 99.9% | **73.4%** |
+| MLP | 100% | 99.9% | 65.2% |
+| Logistic Regression | 100% | 97.6% | 61.6% |
+| SVM (RBF) | 100% | 99.9% | 58.1% |
+| Gaussian Naïve Bayes | 98.6% | 95.0% | 55.1% |
+| Random Forest | 100% | 97.6% | 47.4% |
 
-File-level accuracy (≈ 1 min of speech per decision); chance level is 25 %.
+<p align="center">
+  <img src="reports/figures/04_model_comparison.png" width="49%" alt="File-level accuracy of six models under three protocols, with 95% bootstrap intervals" />
+  <img src="reports/figures/03_tsne_narrators.png" width="47%" alt="t-SNE of file-level features: each island is one narrator" />
+</p>
 
-**Main finding.** A standard stratified split gives near-perfect scores, but the 719 clips come from only
-**~24 distinct narrators**: many contributors cut their clips from the same audiobook. Held-out *narrators* bring accuracy
-down to 47–73 %. The near-perfect scores mostly reflect recognising voices and recordings. The same picture appears
-without labels: the clusters correspond to narrators, not languages.
+| Finding | Interpretation |
+|---|---|
+| Near-perfect scores on random and contributor splits | The same voices and recordings are on both sides; the protocol cannot rank models |
+| Errors on unseen narrators are concentrated in a few voices | Both German-male narrators fail; with only two per cell, the model cannot separate *German* from *that voice* |
+| Accuracy is flat from 10 s to 60 s on unseen narrators | The errors are systematic per voice, so more audio per clip does not help; more narrators would |
+| Log-mel alone (62%) equals all features; LPC alone is below chance (15%) | Static spectra carry language information, but vocal-tract descriptors match voices across languages |
+| Typical confusions: Spanish ↔ Italian and German ↔ Korean | The first is linguistic; the second shows voice matching |
 
-<p align="center"><img src="reports/figures/03_tsne_narrators.png" width="560"><br>
-<em>t-SNE of file-level features: each tight island is one narrator / audiobook.</em></p>
+## Repository Structure
 
-Other findings:
+```text
+spoken-language-identification/
+│
+├── notebooks/
+│   ├── 01_Data_Cleaning_and_Feature_Extraction.ipynb   # audit, cleaning, augmentation, features, narrators, splits
+│   ├── 02_Classification.ipynb                         # preprocessing, model selection, three protocols
+│   ├── 03_Clustering.ipynb                             # choice of k, four algorithms, PCA and t-SNE
+│   └── 04_Evaluation.ipynb                             # metrics, confusion matrices, CIs, duration, ablations
+│
+├── src/slid/
+│   ├── config.py            # paths and signal-processing constants
+│   ├── data.py              # indexing, audit, splits, narrator estimation
+│   ├── cleaning.py          # cleaning, segmentation, augmentation
+│   ├── features.py          # the 381 segment features
+│   ├── pipeline.py          # parallel batch processing
+│   ├── models.py            # classifiers, grouped CV, metrics
+│   ├── clustering.py        # purity and clustering scores
+│   └── plotting.py          # shared plotting style
+│
+├── reports/
+│   ├── figures/             # every figure produced by the notebooks
+│   └── results/             # metrics and predictions (CSV)
+│
+├── tests/                   # unit tests on synthetic signals
+├── data/README.md           # expected layout (audio not included)
+└── REPORT.md                # detailed report
+```
 
-* **Augmentation matters most for new voices:** speed perturbation, pitch shift and noise raise unseen-narrator accuracy
-  from 47 % to 62 % (Logistic Regression).
-* **LDA + KNN generalises best.** Flexible models (Random Forest, RBF-SVM) overfit narrator-specific cues such as
-  chroma and voicing ratio.
-* **Log-mel energies alone** match the full feature set. Removing absolute-pitch features *improves* generalisation.
-* **More speech does not fix unseen-narrator errors:** with new voices, accuracy is flat from 10 s to 60 s because the errors
-  are systematic per voice. Typical confusions: Spanish ↔ Italian (linguistically close) and German ↔ Korean
-  (voice similarity).
+The notebooks are committed with their outputs.
+
+## Installation and Usage
+
+```bash
+git clone https://github.com/faezehmzf/spoken-language-identification.git
+cd spoken-language-identification
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt && .venv/bin/pip install -e .
+.venv/bin/python -m pytest -q            # no audio needed
+```
+
+To rerun the experiments, put the audio in `data/raw/<Language>/<Gender>/*.mp3` (see [data/README.md](data/README.md)) or set `SLID_DATA_DIR`, then run the notebooks in order:
+
+```bash
+export SLID_DATA_DIR=/path/to/dataset
+.venv/bin/jupyter nbconvert --to notebook --execute --inplace notebooks/0*.ipynb
+```
+
+Feature extraction takes about 30 minutes on a 10-core laptop and is cached in `data/processed/`. Classification, including the 24 leave-one-narrator-out folds, takes about 20 minutes more.
 
 ## Dataset
 
@@ -46,98 +155,37 @@ Other findings:
 | contributors | 28 | 18 | 14 | 18 |
 | estimated narrators | 5 | 9 | 5 | 5 |
 
-About 12 hours of speech in ~1-minute MP3 clips, cut at sentence boundaries from public audiobooks and podcasts
-(44.1/48 kHz, mono/stereo). The audio is **not included** in this repository.
+About one-minute MP3 clips cut at sentence boundaries from public audiobooks and podcasts (44.1 or 48 kHz, mono or stereo). The audit found no corrupt files or exact duplicates. File-name problems (double extensions, a language typo) do not matter because labels come from folders. One 25-minute upload that contains the full source of a contributor's other clips was excluded. The audio is **not included**; contributor IDs are replaced by anonymous codes.
 
-Data audit (notebook 1): no corrupt files or duplicates. File-name inconsistencies (double extensions, typos) are
-ignored because labels come from folders. One 25-minute upload of a complete source, which overlaps that contributor's
-other clips, was excluded.
+## Key Concepts
 
-## Pipeline
+- Acoustic language identification: MFCC, shifted delta cepstra, prosody and rhythm features.
+- Speed perturbation and pitch shifting as speaker augmentation.
+- Group-aware evaluation: why splitting by file, contributor or speaker gives different answers.
+- Linear discriminant analysis as a projection that suppresses within-class (speaker) variation.
+- Choosing the number of clusters (elbow, silhouette, BIC) and comparing clusterings with purity, ARI and NMI.
+- Bootstrap confidence intervals when test items are not independent.
 
-```
-MP3 ─► cleaning ─► 10 s segments ─► augmentation (train only) ─► 381 features ─► scale / PCA / LDA ─► classifiers
-                                                                        └──────► file-level vectors ─► clustering
-```
+## Limitations
 
-**Cleaning.** Resample to 16 kHz mono, remove DC, 80 Hz high-pass, shorten pauses longer than 0.3 s (short pauses carry
-rhythm), and normalise active-speech loudness to −23 dBFS. No spectral denoising: estimated SNR is 34–44 dB.
+- Narrator groups are estimated from audio. Knowing which audiobook each contributor used would give the exact grouping.
+- Many language-gender cells have only two narrators, so held-out-narrator results have wide intervals.
+- All models are classical. Speaker-invariant representations (x-vector or ECAPA language embeddings, wav2vec 2.0 / XLS-R, narrator-adversarial training) and phonotactic models are the natural next step.
 
-**Augmentation** (training files only): pink noise at 10–20 dB SNR, speed perturbation ×0.9/×1.1, pitch shift ±1–3
-semitones.
+See the [report](REPORT.md#9-limitations) for details.
 
-**Features** (per 10 s segment, 25 ms frames / 10 ms hop):
+## References
 
-| Group | Dim | Captures |
-|---|:-:|---|
-| MFCC + Δ + ΔΔ | 120 | spectral envelope, phonetic content |
-| Shifted Delta Cepstra (7-1-3-7) | 98 | phone-sequence dynamics; classic LID feature |
-| Log-mel (40 bands) | 80 | spectral energy distribution |
-| Spectral centroid / bandwidth / roll-off / flatness | 8 | brightness, noisiness |
-| Spectral contrast | 14 | harmonic peaks vs valleys |
-| Chroma | 24 | pitch-class energy (baseline) |
-| ZCR, RMS energy | 4 | voicing balance, dynamics |
-| LPC (order 12) | 12 | vocal-tract model |
-| F0 / intonation (pYIN, semitones re. speaker median) | 7 | intonation range and movement |
-| Rhythm (energy modulation spectrum, onset rate, nPVI, pauses) | 14 | stress- vs syllable-timing |
+- P. A. Torres-Carrasquillo et al. (2002). Approaches to Language Identification Using Gaussian Mixture Models and Shifted Delta Cepstral Features. *ICSLP*.
+- T. Ko, V. Peddinti, D. Povey & S. Khudanpur (2015). Audio Augmentation for Speech Recognition. *Interspeech*.
+- H. Li, B. Ma & K. A. Lee (2013). Spoken Language Recognition: From Fundamentals to Practice. *Proceedings of the IEEE* 101(5).
+- E. Grabe & E. L. Low (2002). Durational Variability in Speech and the Rhythm Class Hypothesis. *Laboratory Phonology 7*.
+- M. Mauch & S. Dixon (2014). pYIN: A Fundamental Frequency Estimator Using Probabilistic Threshold Distributions. *ICASSP*.
 
-**Classifiers:** Logistic Regression, RBF-SVM, KNN (+PCA/LDA), Random Forest, MLP, Gaussian NB. Hyper-parameters are
-tuned by grid search with file-grouped CV. Segment probabilities are averaged to give one decision per file.
+## License
 
-**Clustering:** K-Means, Ward agglomerative, GMM (BIC) and DBSCAN on standardised, PCA-reduced file vectors. k is
-chosen by elbow, silhouette and BIC. Clusters are scored with silhouette, purity, ARI and NMI against language, gender and
-narrator.
+The code is released under the [MIT licence](LICENSE). The audio is not included.
 
-**Evaluation protocols**
-
-1. **Random 80/20** stratified by language × gender, split by file. Segments and augmented copies never cross the split.
-2. **Contributor-disjoint** 5-fold CV.
-3. **Leave-one-narrator-out (LONO).** Narrators are estimated by merging contributors whose clips are as similar to
-   each other as clips within one contributor (between/within distance ratio < 1.2, same language and gender).
-
-## Repository structure
-
-```
-notebooks/
-  01_Data_Cleaning_and_Feature_Extraction.ipynb   audit, cleaning, augmentation, features, narrator analysis, splits
-  02_Classification.ipynb                         preprocessing, model selection, three evaluation protocols
-  03_Clustering.ipynb                             k selection, 4 algorithms, cluster composition, PCA / t-SNE
-  04_Evaluation.ipynb                             metrics, confusion matrices, CIs, duration analysis, ablations
-src/slid/
-  config.py      paths and signal-processing constants
-  data.py        indexing, audit, splits, narrator estimation
-  cleaning.py    cleaning, segmentation, augmentation
-  features.py    feature extraction
-  pipeline.py    parallel batch processing
-  models.py      model zoo, CV splits, metrics
-  clustering.py  purity and clustering metrics
-  plotting.py    shared plotting helpers
-reports/
-  figures/       all figures produced by the notebooks
-  results/       metrics and predictions (CSV)
-```
-
-All notebooks are committed already executed.
-
-## Reproducing
-
-```bash
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt && pip install -e .
-```
-
-Put the audio in `data/raw/<Language>/<Gender>/*.mp3`, or point to it with an environment variable:
-
-```bash
-export SLID_DATA_DIR=/path/to/dataset
-```
-
-Then run the notebooks in order. Feature extraction takes about 30 minutes on a 10-core laptop and is cached in
-`data/processed/`. The full classification run, including leave-one-narrator-out, takes about 20 minutes.
-
-## Limitations and next steps
-
-* Narrator groups are estimated from audio. The source assignment of each contributor would give the exact grouping.
-* Many language × gender cells have only two narrators. More voices would help more than more audio per voice.
-* Speaker-invariant representations are the natural next step: x-vector / ECAPA language embeddings, self-supervised
-  speech models (wav2vec 2.0 / XLS-R), narrator-adversarial training, or phonotactic (phone n-gram) models.
+<div align="center">
+<img src="https://capsule-render.vercel.app/api?type=waving&color=0:2c5364,50:203a43,100:0f2027&height=100&section=footer" alt="" />
+</div>

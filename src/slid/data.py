@@ -25,7 +25,7 @@ def build_index(data_dir: Path = C.DATA_DIR) -> pd.DataFrame:
 
     Labels come from the folder structure (Language/Gender), which is more
     reliable than file names (some contain typos such as "koren").
-    The contributor ID in the file name identifies the student who cut the clips;
+    The contributor ID in the file name identifies the person who cut the clips;
     it is replaced by an anonymous code (S01, S02, ...). Several contributors may
     have cut clips from the same audiobook, see `estimate_narrators`.
     """

@@ -6,7 +6,8 @@ __pycache__/
 .DS_Store
 
 # data and generated artefacts (audio is not redistributed)
-data/
+data/*
+!data/README.md
 models/
 *.mp3
 *.wav
