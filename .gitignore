@@ -1,0 +1,14 @@
+# environments
+.venv/
+__pycache__/
+*.egg-info/
+.ipynb_checkpoints/
+.DS_Store
+
+# data and generated artefacts (audio is not redistributed)
+data/
+models/
+*.mp3
+*.wav
+*.flac
+*.parquet

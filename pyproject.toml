@@ -1,0 +1,12 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "slid"
+version = "1.0.0"
+description = "Spoken language identification (German, Italian, Korean, Spanish) with classical ML"
+requires-python = ">=3.10"
+
+[tool.setuptools.packages.find]
+where = ["src"]
